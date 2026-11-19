@@ -13,6 +13,7 @@ output directory; the default is /output.
 
 import hashlib
 import os
+import struct
 import sys
 from pathlib import Path
 
@@ -31,6 +32,17 @@ def main() -> int:
         return 1
     if len(data) > 1_048_576:
         print("error: entry.png exceeds 1 MiB", file=sys.stderr)
+        return 1
+    # The competition requires exactly 1024x1024: read the PNG IHDR chunk
+    # (8-byte signature, 4-byte length, 4-byte type "IHDR", then width and
+    # height as big-endian uint32) and refuse anything else.
+    if len(data) < 29 or data[12:16] != b"IHDR":
+        print("error: entry.png has no IHDR chunk", file=sys.stderr)
+        return 1
+    width, height = struct.unpack(">II", data[16:24])
+    if (width, height) != (1024, 1024):
+        print(f"error: entry.png is {width}x{height}, expected 1024x1024",
+              file=sys.stderr)
         return 1
     out_dir = Path(os.environ.get("DEST_DIR")
                    or os.environ.get("MAKEFUN_OUTPUT_DIR")
